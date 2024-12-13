@@ -60,11 +60,18 @@ class Watcher:
 
     async def __aexit__(self, *exc):
         # This assumes that closing the inotify stream doesn't block
-        await self._stream.aclose()
+        self.close()
+
+    setup = __aenter__  # deprecated
+
+    def _close(self):
+        self._stream.close()
         self._fd = None
         self._stream = None
 
         self._reset()
+
+    close = _close  # deprecated
 
     def watch(self, path, flags, *, alias=None):
         """Add a new watching rule.

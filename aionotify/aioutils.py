@@ -39,9 +39,12 @@ class UnixFileDescriptorStream:
             self._pos = pos
         return res
 
-    async def aclose(self):
+    def close(self):
         os.close(self._fileno)
         self._fileno = None
+
+    async def aclose(self):
+        self.close()
 
     def __repr__(self):
         parts = [

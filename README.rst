@@ -29,16 +29,17 @@ Its use is quite simple:
     import aionotify
 
     # Setup the watcher
-    watcher = aionotify.Watcher()
-    watcher.watch(alias='logs', path='/var/log', flags=aionotify.Flags.MODIFY)
 
     async def work():
-        await watcher.setup()
-        for _i in range(10):
-            # Pick the 10 first events
-            event = await watcher.get_event()
-            print(event)
-        watcher.close()
+        async with aionotify.Watcher() as watcher:
+            await watcher.awatch(alias='logs', path='/var/log', flags=aionotify.Flags.MODIFY)
+            i = 0
+            async for event in watcher:
+                # Pick the 10 first events
+                print(event)
+                i += 1
+                if i >= 10:
+                    return
 
     anyio.run(work)
 
