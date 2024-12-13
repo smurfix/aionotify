@@ -42,6 +42,10 @@ Its use is quite simple:
 
     anyio.run(work)
 
+    # alternately:
+    # asyncio.run(work())
+    # trio.run(work)
+
 
 Links
 -----
