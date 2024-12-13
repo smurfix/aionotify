@@ -6,7 +6,6 @@
 import aionotify
 import argparse
 import anyio
-import logging
 
 
 class Example:
@@ -27,6 +26,7 @@ class Example:
                 i += 1
                 if i >= max_events:
                     return
+
 
 def main(args):
     example = Example()

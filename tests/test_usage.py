@@ -2,13 +2,12 @@
 # This code is distributed under the two-clause BSD License.
 
 import anyio
-import logging
-import tempfile
 import pytest
 
 import aionotify
 
 pytestmark = pytest.mark.anyio
+
 
 class AIONotifyTestCase:
     # Utility functions
@@ -28,7 +27,7 @@ class AIONotifyTestCase:
 
     def _touch(self, filename, *, parent=None):
         path = (parent or self.testdir) / filename
-        with path.open('w') as f:
+        with path.open('w'):
             pass
 
     def _unlink(self, filename, *, parent=None):

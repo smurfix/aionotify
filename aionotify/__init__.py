@@ -5,4 +5,3 @@ from .enums import Flags
 from .base import Watcher
 
 __all__ = ['Flags', 'Watcher']
-

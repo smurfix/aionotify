@@ -2,7 +2,6 @@
 # This code is distributed under the two-clause BSD License.
 
 import anyio
-import errno
 import logging
 import os
 
@@ -31,7 +30,7 @@ class UnixFileDescriptorStream:
             self._buf = os.read(self._fileno, self.max_size)
 
         pos = self._pos
-        res = self._buf[pos:pos+nbytes]
+        res = self._buf[pos:(pos + nbytes)]
         pos += nbytes
         if pos >= len(self._buf):
             self.pos = 0
@@ -50,4 +49,3 @@ class UnixFileDescriptorStream:
             'fd=%s' % self._fileno,
         ]
         return '<%s>' % ' '.join(parts)
-

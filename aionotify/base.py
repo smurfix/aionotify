@@ -35,7 +35,7 @@ PREFIX = struct.Struct('iIII')
 class Watcher:
     max_size = 1024
 
-    _fd:int = None
+    _fd: int = None
     _stream: UnixFileDescriptorStream = None
 
     def __init__(self):
