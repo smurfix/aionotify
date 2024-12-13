@@ -1,0 +1,15 @@
+Source: aionotify
+Maintainer: Matthias Urlichs <matthias@urlichs.de>
+Section: python
+Priority: optional
+Build-Depends: dh-python, python3-setuptools, python3-all, debhelper (>= 12)
+Standards-Version: 4.7.0
+Homepage: https://github.com/rbarrois/aionotify
+
+Package: python3-aionotify
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends},
+  python3-anyio (>= 4.7),
+Description: Async inotify library
+ This is a simple async Python wrapper for "inotify".
+ It supports asyncio and trio.
