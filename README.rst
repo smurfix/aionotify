@@ -18,14 +18,14 @@ aionotify
     :alt: License
 
 
-``aionotify`` is a simple, asyncio-based inotify library.
+``aionotify`` is a simple, anyio-based inotify library.
 
 
 Its use is quite simple:
 
 .. code-block:: python
 
-    import asyncio
+    import anyio
     import aionotify
 
     # Setup the watcher
@@ -40,7 +40,7 @@ Its use is quite simple:
             print(event)
         watcher.close()
 
-    asyncio.run(work())
+    anyio.run(work)
 
 
 Links

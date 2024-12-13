@@ -1,12 +1,12 @@
 # Copyright (c) 2016 The aionotify project
 # This code is distributed under the two-clause BSD License.
 
-import asyncio
+import anyio
 import collections
 import ctypes
 import struct
 
-from . import aioutils
+from .aioutils import UnixFileDescriptorStream
 
 Event = collections.namedtuple('Event', ['flags', 'cookie', 'name', 'alias'])
 
@@ -22,7 +22,7 @@ class LibC:
 
     @classmethod
     def inotify_add_watch(cls, fd, path, flags):
-        return _libc.inotify_add_watch(fd, path.encode('utf-8'), flags)
+        return _libc.inotify_add_watch(fd, str(path).encode('utf-8'), flags)
 
     @classmethod
     def inotify_rm_watch(cls, fd, wd):
@@ -33,6 +33,10 @@ PREFIX = struct.Struct('iIII')
 
 
 class Watcher:
+    max_size = 1024
+
+    _fd:int = None
+    _stream: UnixFileDescriptorStream = None
 
     def __init__(self):
         self.requests = {}
@@ -41,10 +45,26 @@ class Watcher:
     def _reset(self):
         self.descriptors = {}
         self.aliases = {}
-        self._stream = None
-        self._transport = None
+
+    async def __aenter__(self):
+        """Start the watcher, registering new watches if any."""
+        if self._fd is not None:
+            raise RuntimeError("Can't enter my context twice")
+        self._fd = LibC.inotify_init()
+        self._stream = UnixFileDescriptorStream(self._fd)
+
+        for alias, (path, flags) in self.requests.items():
+            self._setup_watch(alias, path, flags)
+
+        return self
+
+    async def __aexit__(self, *exc):
+        # This assumes that closing the inotify stream doesn't block
+        await self._stream.aclose()
         self._fd = None
-        self._loop = None
+        self._stream = None
+
+        self._reset()
 
     def watch(self, path, flags, *, alias=None):
         """Add a new watching rule."""
@@ -53,7 +73,7 @@ class Watcher:
         if alias in self.requests:
             raise ValueError("A watch request is already scheduled for alias %s" % alias)
         self.requests[alias] = (path, flags)
-        if self._fd is not None:
+        if self._stream is not None:
             # We've started, register the watch immediately.
             self._setup_watch(alias, path, flags)
 
@@ -79,52 +99,37 @@ class Watcher:
         self.descriptors[alias] = wd
         self.aliases[wd] = alias
 
-    async def setup(self, loop=None):
-        """Start the watcher, registering new watches if any."""
-        self._loop = loop or asyncio.get_running_loop()
-
-        self._fd = LibC.inotify_init()
-        for alias, (path, flags) in self.requests.items():
-            self._setup_watch(alias, path, flags)
-
-        # We pass ownership of the fd to the transport; it will close it.
-        self._stream, self._transport = await aioutils.stream_from_fd(self._fd, self._loop)
-
-    def close(self):
-        """Schedule closure.
-
-        This will close the transport and all related resources.
-        """
-        self._transport.close()
-        self._reset()
-
-    @property
     def closed(self):
         """Are we closed?"""
-        return self._transport is None
+        return self._fd is None
 
-    async def get_event(self):
-        """Fetch an event.
+    def __aiter__(self):
+        return self
 
-        This coroutine will swallow events for removed watches.
-        """
+    async def __anext__(self):
+        """whenever the fd is ready for reading."""
+
+        # This code does not handle EOF because the file descriptor is
+        # closed exclusively via `__aexit__`.
+
         while True:
-            prefix = await self._stream.readexactly(PREFIX.size)
-            if prefix == b'':
-                # We got closed, return None.
-                return
+            prefix = await self._stream.read(PREFIX.size)
             wd, flags, cookie, length = PREFIX.unpack(prefix)
-            path = await self._stream.readexactly(length)
+            path = await self._stream.read(length)
 
             # All async performed, time to look at the event's content.
-            if wd not in self.aliases:
+            try:
+                alias = self.aliases[wd]
+            except KeyError:
                 # Event for a removed watch, skip it.
                 continue
 
-            decoded_path = struct.unpack('%ds' % length, path)[0].rstrip(b'\x00').decode('utf-8')
+            decoded_path = struct.unpack('%ds' % length, path)[0].rstrip(b'\x00').decode('utf-8', errors="replace")
             return Event(
                 flags=flags,
                 cookie=cookie,
                 name=decoded_path,
-                alias=self.aliases[wd],
+                alias=alias,
             )
+
+    get_event = __anext__
