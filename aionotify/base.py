@@ -54,7 +54,7 @@ class Watcher:
         self._stream = UnixFileDescriptorStream(self._fd)
 
         for alias, (path, flags) in self.requests.items():
-            self._setup_watch(alias, path, flags)
+            await self._setup_watch(alias, path, flags)
 
         return self
 
@@ -67,7 +67,12 @@ class Watcher:
         self._reset()
 
     def watch(self, path, flags, *, alias=None):
-        """Add a new watching rule."""
+        """Add a new watching rule.
+
+        This is the sync version.
+
+        Warning: This method may block if called inside the context
+        manager. You should use `awatch` instead."""
         if alias is None:
             alias = path
         if alias in self.requests:
@@ -75,7 +80,21 @@ class Watcher:
         self.requests[alias] = (path, flags)
         if self._stream is not None:
             # We've started, register the watch immediately.
-            self._setup_watch(alias, path, flags)
+            self._setup_watch_sync(alias, path, flags)
+
+    async def awatch(self, path, flags, *, alias=None):
+        """Add a new watching rule.
+
+        This is the async version.
+        """
+        if alias is None:
+            alias = path
+        if alias in self.requests:
+            raise ValueError("A watch request is already scheduled for alias %s" % alias)
+        self.requests[alias] = (path, flags)
+        if self._stream is not None:
+            # We've started, register the watch immediately.
+            await self._setup_watch(alias, path, flags)
 
     def unwatch(self, alias):
         """Stop watching a given rule."""
@@ -89,7 +108,17 @@ class Watcher:
         del self.requests[alias]
         del self.aliases[wd]
 
-    def _setup_watch(self, alias, path, flags):
+    async def _setup_watch(self, alias, path, flags):
+        """Actual rule setup."""
+        assert alias not in self.descriptors, "Registering alias %s twice!" % alias
+        wd = await anyio.to_thread.run_sync(LibC.inotify_add_watch, self._fd, path, flags)
+        if wd < 0:
+            raise IOError("Error setting up watch on %s with flags %s: wd=%s" % (
+                path, flags, wd))
+        self.descriptors[alias] = wd
+        self.aliases[wd] = alias
+
+    def _setup_watch_sync(self, alias, path, flags):
         """Actual rule setup."""
         assert alias not in self.descriptors, "Registering alias %s twice!" % alias
         wd = LibC.inotify_add_watch(self._fd, path, flags)

@@ -73,9 +73,9 @@ class TestSimpleUsage(AIONotifyTestCase):
             # And it's over.
             await self._assert_no_events()
 
-    async def test_watch_before_start_default_loop(self):
+    async def test_watch_before_start_async(self):
         """A watch call is valid before startup."""
-        self.watcher.watch(self.testdir, aionotify.Flags.CREATE)
+        await self.watcher.awatch(self.testdir, aionotify.Flags.CREATE)
         async with self.watcher:
 
             # Touch a file: we get the event.
@@ -90,6 +90,19 @@ class TestSimpleUsage(AIONotifyTestCase):
         """A watch call is valid after startup."""
         async with self.watcher:
             self.watcher.watch(self.testdir, aionotify.Flags.CREATE)
+
+            # Touch a file: we get the event.
+            self._touch('a')
+            event = await self.watcher.get_event()
+            self._assert_file_event(event, 'a')
+
+            # And it's over.
+            await self._assert_no_events()
+
+    async def test_watch_after_start_async(self):
+        """A watch call is valid after startup."""
+        async with self.watcher:
+            await self.watcher.awatch(self.testdir, aionotify.Flags.CREATE)
 
             # Touch a file: we get the event.
             self._touch('a')
